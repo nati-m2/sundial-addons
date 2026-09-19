@@ -1,0 +1,70 @@
+name: Sundial
+version: "4.0.19"
+slug: sundial
+description: >-
+  Shabbat and holiday automation that schedules itself from templates, so the
+  times move with the calendar instead of being edited every week.
+url: https://github.com/nati-m2/Sundial
+# Only what is actually published to the registry below. A Raspberry Pi 4 running
+# 64-bit HAOS is aarch64; `ha info` on the machine reports which it is.
+arch:
+  - aarch64
+
+# The Supervisor pulls this rather than building from the Dockerfile beside this
+# file, which is the kinder option on a Raspberry Pi, where a local build takes a
+# while. The tag it asks for is `version:` above, so the two move together: a
+# release bumps the version here and pushes an image carrying the matching tag.
+# The registry is private - the machine needs `ha docker registries add` once.
+# Comment this out to go back to a Supervisor-side build from addon/Dockerfile.
+image: registry.natilab.com/sundial-{arch}
+
+init: false
+startup: application
+boot: auto
+
+# Restarts the add-on if the interface stops answering. The probe reports liveness
+# only - an unreachable database or a Home Assistant restart leaves it answering
+# happily, because restarting the add-on would fix neither and would interrupt a
+# schedule that is still running from the local snapshot.
+watchdog: http://[HOST]:[PORT:8000]/api/v1/ping
+
+# The interface is served through Ingress, so it appears inside Home Assistant and
+# inherits its authentication. No port is published and no token has to be created.
+ingress: true
+ingress_port: 8000
+panel_icon: mdi:candle
+panel_title: שעון שבת
+homeassistant_api: true
+# Needed to read the MariaDB add-on's connection details from the Supervisor's
+# services API.
+hassio_api: true
+
+# `want`, not `need`: pointing the add-on at an external MySQL or MariaDB is a
+# legitimate choice, and it must still install for someone who has made it.
+services:
+  - mysql:want
+
+# No `map:` entry. /data is the add-on's own persistent volume and is always
+# mounted; it holds the plan snapshot, which is the only state that has to survive
+# an update.
+
+options:
+  log_level: info
+  use_mariadb_addon: true
+  db_host: ""
+  db_port: 3306
+  db_user: ""
+  db_password: ""
+  db_name: sundial
+
+schema:
+  log_level: list(trace|debug|info|warning|error)?
+  # On by default. Leave it on and install the MariaDB add-on, and the connection
+  # details arrive through the Supervisor - there is nothing to fill in below.
+  use_mariadb_addon: bool?
+  # Only for an external database. Setting db_host overrides the discovery above.
+  db_host: str?
+  db_port: port?
+  db_user: str?
+  db_password: password?
+  db_name: str?
